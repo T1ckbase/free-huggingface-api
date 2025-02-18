@@ -1,15 +1,25 @@
 import 'dotenv/config';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
-import { logger } from 'hono/logger';
+import { logger as honoLogger } from 'hono/logger';
+import { GitHubKVStore } from './services/kv.js';
+import { KeyManager } from './services/key-manager.js';
+import { rot13 } from './utils/string.js';
 
 const BASE_URL = 'https://router.huggingface.co';
 
-import './services/playwright.ts';
+const kv = new GitHubKVStore({
+  token: process.env.GITHUB_ACCESS_TOKEN!,
+  owner: process.env.GITHUB_USERNAME!,
+  repo: process.env.GITHUB_REPO!,
+  extraEncoding: rot13,
+});
+
+const keyManager = new KeyManager(kv);
 
 const app = new Hono();
 
-app.use('*', logger());
+app.use('*', honoLogger());
 app.get('/', (c) => {
   return c.text('Hello Hono!');
 });
@@ -19,15 +29,7 @@ app.post('*', async (c) => {
   const targetPath = url.pathname + url.search;
   const targetUrl = `${BASE_URL}${targetPath}`;
 
-  const headers = new Headers(c.req.raw.headers);
-  headers.set('Authorization', `Bearer ${TODO}`);
-  headers.get('x-use-cache') || headers.set('x-use-cache', 'false');
-
-  return await fetch(targetUrl, {
-    method: 'POST',
-    headers: headers,
-    body: c.req.raw.body,
-  });
+  return await keyManager.handleRequest(targetUrl, c.req.raw.headers, c.req.raw.body);
 });
 
 const port = 7860;

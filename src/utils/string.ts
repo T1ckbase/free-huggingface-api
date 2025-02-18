@@ -1,13 +1,9 @@
 export function randomString(length: number): string {
-  return [...crypto.getRandomValues(new Uint8Array(length))]
-    .map((x, i) => (i = x / 255 * 61 | 0, String.fromCharCode(i + (i > 9 ? i > 35 ? 61 : 55 : 48))))
-    .join('');
+  return [...crypto.getRandomValues(new Uint8Array(length))].map((x, i) => ((i = ((x / 255) * 61) | 0), String.fromCharCode(i + (i > 9 ? (i > 35 ? 61 : 55) : 48)))).join('');
 }
 
 export function randomLowercaseString(length: number): string {
-  return [...crypto.getRandomValues(new Uint8Array(length))]
-    .map(x => String.fromCharCode(x % 26 + 97))
-    .join('');
+  return [...crypto.getRandomValues(new Uint8Array(length))].map((x) => String.fromCharCode((x % 26) + 97)).join('');
 }
 
 export function randomPassword(length: number): string {
@@ -41,7 +37,19 @@ export function randomPassword(length: number): string {
   }
 
   // Shuffle the password to mix the guaranteed characters
-  password = password.split('').sort(() => Math.random() - 0.5).join('');
+  password = password
+    .split('')
+    .sort(() => Math.random() - 0.5)
+    .join('');
 
   return password;
+}
+
+export function extractUrls(text: string): string[] {
+  const regex = /(https?:\/\/[^\s]+)/g;
+  return [...(text.match(regex) ?? [])];
+}
+
+export function rot13(text: string): string {
+  return text.replace(/[a-z]/gi, (letter) => String.fromCharCode(letter.charCodeAt(0) + (letter.toLowerCase() <= 'm' ? 13 : -13)));
 }

@@ -6,7 +6,7 @@ export const logger = winston.createLogger({
     winston.format.colorize({ all: true }),
     winston.format.errors({ stack: true }),
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
-    winston.format.printf(({ timestamp, level, message }) => `${timestamp} [${level}] ${message}`)
+    winston.format.printf(({ timestamp, level, message, stack }) => `${timestamp} [${level}] ${message} ${stack ?? ''}`)
   ),
   transports: [new winston.transports.Console()],
 });

@@ -1,6 +1,6 @@
 import * as url from 'node:url';
 import type { Token, MailGWWrapper, Domain, MailAccount, MailMessage } from '../types/mailgw.js';
-import { randomLowercaseString } from '../utils/random.js';
+import { randomLowercaseString } from '../utils/string.js';
 
 const BASE_URL = 'https://api.mail.gw';
 const BASE_URL_2 = 'https://api.mail.tm';
@@ -71,6 +71,7 @@ export class MailGWClient {
   }
 
   async deleteAccount(): Promise<void> {
+    this.stopMessagePolling();
     const response = await fetch(`${this.baseUrl}/accounts/${this.token.id}`, {
       method: 'DELETE',
       headers: {

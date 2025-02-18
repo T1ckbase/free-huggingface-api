@@ -1,11 +1,10 @@
 import * as url from 'node:url';
 import { chromium, devices } from 'playwright';
 import { createRandomMailAccount } from './mailgw.js';
-import { randomString, randomPassword } from '../utils/random.js';
+import { randomString, randomPassword, extractUrls } from '../utils/string.js';
 import { getRandomCatImage } from './cat.js';
 import { findItemPositionsInGrid } from './ai.js';
 import { logger } from '../logger.js';
-import { extractUrls } from '../utils/regex.js';
 
 export async function createHuggingFaceToken(): Promise<string> {
   return new Promise(async (resolve, reject) => {
@@ -14,8 +13,9 @@ export async function createHuggingFaceToken(): Promise<string> {
     const { address } = await client.me();
     logger.info(`Created random mail account: ${address}`);
 
-    const browser = await chromium.launch({ headless: false });
+    const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ ...devices['Desktop Chrome'], colorScheme: 'dark', viewport: { width: 1920, height: 1080 } });
+    let timeoutId: NodeJS.Timeout | null = null;
     try {
       logger.info('Launching browser and setting up context');
       await context.addInitScript({ path: 'src/scripts/anti-bot-detection.js' });
@@ -65,10 +65,11 @@ export async function createHuggingFaceToken(): Promise<string> {
       }
 
       await page.waitForTimeout(1000);
-      logger.info('Starting account creation process');
+      const password = randomPassword(12);
+      logger.info(`Starting account creation process email: ${address}, password: ${password}`);
       await page.locator('form input[name="email"]').fill(address);
-      await page.locator('form input[name="password"]').fill(randomPassword(12));
-      await page.locator('form button[type="submit"]').click();
+      await page.locator('form input[name="password"]').fill(password);
+      await page.getByRole('button', { name: 'Next' }).click();
 
       const username = crypto.randomUUID(); // randomString(15);
       logger.info(`Creating account with username: ${username}`);
@@ -83,7 +84,7 @@ export async function createHuggingFaceToken(): Promise<string> {
       await page.waitForTimeout(2000);
       await page.getByText('Upload file').waitFor();
       await page.locator('form input[type="checkbox"]').check();
-      await page.locator('form button[type="submit"]').click();
+      await page.getByRole('button', { name: 'Create Account' }).click();
       logger.info('Submitted account creation form');
 
       logger.info('Waiting for confirmation email');
@@ -108,10 +109,10 @@ export async function createHuggingFaceToken(): Promise<string> {
           const tokenName = randomString(15);
           logger.info(`Creating token with name: ${tokenName}`);
           await page.locator('form input[name="displayName"]').fill(tokenName);
-          await page.locator('form input[type="checkbox"][value="inference.serverless.write"]').check();
-          await page.locator('form input[type="checkbox"][value="inference.endpoints.infer.write"]').check();
-          await page.locator('form input[type="checkbox"][value="inference.endpoints.write"]').check();
-          await page.locator('form button[type="submit"]').click();
+          await page.locator('form input[type="checkbox"][value="inference.serverless.write"]').first().check();
+          await page.locator('form input[type="checkbox"][value="inference.endpoints.infer.write"]').first().check();
+          await page.locator('form input[type="checkbox"][value="inference.endpoints.write"]').first().check();
+          await page.getByRole('button', { name: 'Create token' }).click();
           logger.info('Submitted token creation form');
 
           const token = await page.locator('form input[readonly]').inputValue();
@@ -127,13 +128,21 @@ export async function createHuggingFaceToken(): Promise<string> {
           logger.info('Closing browser');
           await context.close();
           await browser.close();
+          if (timeoutId) clearTimeout(timeoutId);
         }
       });
+
+      timeoutId = setTimeout(async () => {
+        logger.error('Timeout waiting for confirmation email, cleaning up account');
+        await client.deleteAccount();
+        reject(new Error('Timeout waiting for confirmation email'));
+      }, 60000);
     } catch (error) {
       logger.error('Error during account creation:', error);
       reject(error);
       await context.close();
       await browser.close();
+      if (timeoutId) clearTimeout(timeoutId);
     }
   });
 }
