@@ -19,5 +19,6 @@
   "devDependencies": {
     "@types/node": "^22.13.4",
     "tsx": "^4.7.1"
-  }
+  },
+  "packageManager": "pnpm@10.4.0"
 }

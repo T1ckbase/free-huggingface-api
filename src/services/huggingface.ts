@@ -44,11 +44,8 @@ export class HuggingFaceHandler {
     await this.initialize();
 
     if (this.getActiveKeyCount() === 0) {
-      try {
-        await this.createKey();
-      } catch (error) {
-        return new Response('No API keys available', { status: 503 });
-      }
+      this.createKey();
+      return new Response('No API keys available', { status: 503 });
     }
 
     // Create an array of body streams for each potential request
@@ -112,12 +109,13 @@ export class HuggingFaceHandler {
   /**
    * Creates a new API key and adds it to the first null slot
    */
-  private async createKey(): Promise<string> {
+  private async createKey(): Promise<string | null> {
     if (this.isCreatingKey) {
       if (Date.now() - this.lastCreationAttempt > config.keys.lockTimeout) {
         this.isCreatingKey = false;
       } else {
-        throw new Error('Key creation in progress');
+        logger.info('Key creation already in progress');
+        return null;
       }
     }
 
@@ -140,9 +138,19 @@ export class HuggingFaceHandler {
       // Only persist when reaching the target count
       if (activeCount === config.keys.minCount) {
         await this.persistKeys();
+      } else if (activeCount < config.keys.minCount) {
+        // Create another key if we haven't reached the target count
+        setTimeout(() => {
+          this.createKey().catch((error) => {
+            logger.warn('Failed to create additional key:', error);
+          });
+        }, 1000); // Add a small delay between creations
       }
 
       return key;
+    } catch (error) {
+      logger.error('Failed to create key:', error);
+      return null;
     } finally {
       this.isCreatingKey = false;
     }
