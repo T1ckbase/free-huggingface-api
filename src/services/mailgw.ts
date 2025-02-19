@@ -1,6 +1,7 @@
 import * as url from 'node:url';
 import type { Token, MailGWWrapper, Domain, MailAccount, MailMessage } from '../types/mailgw.js';
 import { randomLowercaseString } from '../utils/string.js';
+import { logger } from '../logger.js';
 
 const BASE_URL = 'https://api.mail.gw';
 const BASE_URL_2 = 'https://api.mail.tm';
@@ -70,17 +71,20 @@ export class MailGWClient {
     return await response.json();
   }
 
-  async deleteAccount(): Promise<void> {
+  async deleteAccount(): Promise<boolean> {
     this.stopMessagePolling();
-    const response = await fetch(`${this.baseUrl}/accounts/${this.token.id}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${this.token.token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to delete account: ${response.status} ${response.statusText}`);
+    try {
+      const response = await fetch(`${this.baseUrl}/accounts/${this.token.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${this.token.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.ok;
+    } catch (error) {
+      logger.warn('Failed to delete account:', error);
+      return false;
     }
   }
 
